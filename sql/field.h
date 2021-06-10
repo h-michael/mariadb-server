@@ -3493,18 +3493,18 @@ public:
   /**
      Return pointer to blob cache or NULL if not cached.
   */
-  String * cached(bool &set_read_value)
+  String * cached(bool *set_read_value)
   {
     char *tmp= (char *) get_ptr();
     if (!value.is_empty() && tmp == value.ptr())
     {
-      set_read_value= false;
+      *set_read_value= false;
       return &value;
     }
 
     if (!read_value.is_empty() && tmp == read_value.ptr())
     {
-      set_read_value= true;
+      *set_read_value= true;
       return &read_value;
     }
 
