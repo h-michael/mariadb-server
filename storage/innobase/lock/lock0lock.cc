@@ -4950,6 +4950,7 @@ should be created.
 @param[in]	rec		record on the leaf page
 @param[in]	index		the index of the record
 @param[in]	offsets		rec_get_offsets(rec,index)
+@param[in]	gap_lock	true if requested lock is gap lock
 @return	whether caller_trx already holds an exclusive lock on rec */
 static
 bool
@@ -4958,7 +4959,8 @@ lock_rec_convert_impl_to_expl(
 	page_id_t		id,
 	const rec_t*		rec,
 	dict_index_t*		index,
-	const rec_offs*		offsets)
+	const rec_offs*		offsets,
+	bool		gap_lock)
 {
 	trx_t*		trx;
 
@@ -4969,6 +4971,9 @@ lock_rec_convert_impl_to_expl(
 	ut_ad(page_rec_is_leaf(rec));
 	ut_ad(!rec_is_metadata(rec, *index));
 
+	if (lock_table_has(caller_trx, index->table, LOCK_X))
+	  return true;
+
 	if (dict_index_is_clust(index)) {
 		trx_id_t	trx_id;
 
@@ -4978,16 +4983,19 @@ lock_rec_convert_impl_to_expl(
 			return false;
 		}
 		if (UNIV_UNLIKELY(trx_id == caller_trx->id)) {
-			return true;
+			if (!gap_lock)
+			  return true;
+			trx = caller_trx;
+			trx->reference();
 		}
-
-		trx = trx_sys.find(caller_trx, trx_id);
+		else
+		  trx = trx_sys.find(caller_trx, trx_id);
 	} else {
 		ut_ad(!dict_index_is_online_ddl(index));
 
 		trx = lock_sec_rec_some_has_impl(caller_trx, rec, index,
 						 offsets);
-		if (trx == caller_trx) {
+		if (trx == caller_trx && !gap_lock) {
 			trx->release_reference();
 			return true;
 		}
@@ -5048,7 +5056,7 @@ lock_clust_rec_modify_check_and_lock(
 	for it */
 
 	if (lock_rec_convert_impl_to_expl(thr_get_trx(thr), block->page.id(),
-					  rec, index, offsets)) {
+					  rec, index, offsets, false)) {
 		/* We already hold an implicit exclusive lock. */
 		return DB_SUCCESS;
 	}
@@ -5218,7 +5226,8 @@ lock_sec_rec_read_check_and_lock(
 	if (!page_rec_is_supremum(rec)
 	    && page_get_max_trx_id(block->frame) >= trx_sys.get_min_trx_id()
 	    && lock_rec_convert_impl_to_expl(thr_get_trx(thr), id, rec,
-					     index, offsets)) {
+					     index, offsets,
+					     gap_mode != LOCK_REC_NOT_GAP)) {
 		/* We already hold an implicit exclusive lock. */
 		return DB_SUCCESS;
 	}
@@ -5302,7 +5311,8 @@ lock_clust_rec_read_check_and_lock(
 
 	if (heap_no != PAGE_HEAP_NO_SUPREMUM
 	    && lock_rec_convert_impl_to_expl(thr_get_trx(thr), id, rec,
-					     index, offsets)) {
+					     index, offsets,
+					     gap_mode != LOCK_REC_NOT_GAP)) {
 		/* We already hold an implicit exclusive lock. */
 		return DB_SUCCESS;
 	}
