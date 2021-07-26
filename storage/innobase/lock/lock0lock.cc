@@ -4983,21 +4983,17 @@ lock_rec_convert_impl_to_expl(
 			return false;
 		}
 		if (UNIV_UNLIKELY(trx_id == caller_trx->id)) {
-			if (!gap_lock)
-			  return true;
-			trx = caller_trx;
-			trx->reference();
+			return !gap_lock;
 		}
-		else
-		  trx = trx_sys.find(caller_trx, trx_id);
+		trx = trx_sys.find(caller_trx, trx_id);
 	} else {
 		ut_ad(!dict_index_is_online_ddl(index));
 
 		trx = lock_sec_rec_some_has_impl(caller_trx, rec, index,
 						 offsets);
-		if (trx == caller_trx && !gap_lock) {
+		if (trx == caller_trx) {
 			trx->release_reference();
-			return true;
+			return !gap_lock;
 		}
 
 		ut_d(lock_rec_other_trx_holds_expl(caller_trx, trx, rec, id));
