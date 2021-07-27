@@ -1264,17 +1264,11 @@ lock_rec_enqueue_waiting(
 
 	trx_t* trx = thr_get_trx(thr);
 	ut_ad(trx->mutex_is_owner());
-
-	if (UNIV_UNLIKELY(trx->dict_operation_lock_mode == RW_X_LATCH)) {
-		ut_ad(!strcmp(index->table->name.m_name, TABLE_STATS_NAME)
-		      || !strcmp(index->table->name.m_name, INDEX_STATS_NAME));
-instant_timeout:
-		trx->error_state = DB_LOCK_WAIT_TIMEOUT;
-		return DB_LOCK_WAIT_TIMEOUT;
-	}
+	ut_ad(!trx->dict_operation_lock_mode);
 
 	if (trx->mysql_thd && thd_lock_wait_timeout(trx->mysql_thd) == 0) {
-		goto instant_timeout;
+		trx->error_state = DB_LOCK_WAIT_TIMEOUT;
+		return DB_LOCK_WAIT_TIMEOUT;
 	}
 
 	/* Enqueue the lock request that will wait to be granted, note that
@@ -1480,6 +1474,7 @@ lock_rec_lock(
         ((LOCK_MODE_MASK | LOCK_TABLE) & mode) == LOCK_X);
   ut_ad(~mode & (LOCK_GAP | LOCK_REC_NOT_GAP));
   ut_ad(dict_index_is_clust(index) || !dict_index_is_online_ddl(index));
+  ut_ad(!trx->dict_operation_lock_mode);
   DBUG_EXECUTE_IF("innodb_report_deadlock", return DB_DEADLOCK;);
 
   ut_ad((LOCK_MODE_MASK & mode) != LOCK_S ||
@@ -3094,6 +3089,7 @@ lock_table_create(
 	ut_ad(!trx->is_wsrep() || lock_sys.is_writer());
 	ut_ad(trx->state == TRX_STATE_ACTIVE || trx->is_recovered);
 	ut_ad(!trx->is_autocommit_non_locking());
+	ut_ad(!trx->dict_operation_lock_mode);
 
 	switch (LOCK_MODE_MASK & type_mode) {
 	case LOCK_AUTO_INC:
@@ -3310,13 +3306,7 @@ lock_table_enqueue_waiting(
 
 	trx_t* trx = thr_get_trx(thr);
 	ut_ad(trx->mutex_is_owner());
-
-	if (UNIV_UNLIKELY(trx->dict_operation_lock_mode == RW_X_LATCH)) {
-		ut_ad(!strcmp(table->name.m_name, TABLE_STATS_NAME)
-		      || !strcmp(table->name.m_name, INDEX_STATS_NAME));
-		trx->error_state = DB_LOCK_WAIT_TIMEOUT;
-		return DB_LOCK_WAIT_TIMEOUT;
-	}
+	ut_ad(!trx->dict_operation_lock_mode);
 
 #ifdef WITH_WSREP
 	if (trx->is_wsrep() && trx->lock.was_chosen_as_deadlock_victim) {
