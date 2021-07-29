@@ -399,6 +399,13 @@ bool Item_func_to_base64::fix_length_and_dec()
   return FALSE;
 }
 
+String* Item_func_natural_sort_key::val_str(String* s)
+{
+  uint err;
+  const String *val= args[0]->val_str();
+  s->copy(val,&my_charset_utf8mb4_bin,&err);
+  return s;
+}
 
 String *Item_func_to_base64::val_str_ascii(String *str)
 {

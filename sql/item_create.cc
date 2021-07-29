@@ -1622,6 +1622,15 @@ protected:
   virtual ~Create_func_name_const() {}
 };
 
+class Create_func_natural_sort_key : public Create_func_arg1
+{
+public:
+  virtual Item *create_1_arg(THD *thd, Item *arg);
+  static Create_func_natural_sort_key s_singleton;
+protected:
+  Create_func_natural_sort_key() {}
+  virtual ~Create_func_natural_sort_key() {}
+};
 
 class Create_func_nullif : public Create_func_arg2
 {
@@ -4642,6 +4651,12 @@ Create_func_md5::create_1_arg(THD *thd, Item *arg1)
   return new (thd->mem_root) Item_func_md5(thd, arg1);
 }
 
+Create_func_natural_sort_key Create_func_natural_sort_key::s_singleton;
+
+Item *Create_func_natural_sort_key::create_1_arg(THD *thd, Item *arg1)
+{
+  return new (thd->mem_root) Item_func_natural_sort_key(thd, arg1);
+}
 
 Create_func_monthname Create_func_monthname::s_singleton;
 
@@ -5648,6 +5663,7 @@ Native_func_registry func_array[] =
   { { STRING_WITH_LEN("MD5") }, BUILDER(Create_func_md5)},
   { { STRING_WITH_LEN("MONTHNAME") }, BUILDER(Create_func_monthname)},
   { { STRING_WITH_LEN("NAME_CONST") }, BUILDER(Create_func_name_const)},
+  {  {STRING_WITH_LEN("NATURAL_SORT_KEY")}, BUILDER(Create_func_natural_sort_key)},
   { { STRING_WITH_LEN("NVL") }, BUILDER(Create_func_ifnull)},
   { { STRING_WITH_LEN("NVL2") }, BUILDER(Create_func_nvl2)},
   { { STRING_WITH_LEN("NULLIF") }, BUILDER(Create_func_nullif)},
