@@ -7605,6 +7605,15 @@ alter_commands:
             if (Lex->stmt_alter_table_exchange_partition($6))
               MYSQL_YYABORT;
           }
+        | EXTRACT_SYM PARTITION_SYM alt_part_name_item
+          AS TABLE_SYM table_ident have_partitioning
+          {
+            Lex->m_sql_cmd= new (thd->mem_root) Sql_cmd_alter_table();
+            if (unlikely(Lex->m_sql_cmd == NULL))
+              MYSQL_YYABORT;
+            Lex->alter_info.partition_flags|= ALTER_PARTITION_EXTRACT |
+                                              ALTER_PARTITION_DROP;
+          }
         ;
 
 remove_partitioning:
