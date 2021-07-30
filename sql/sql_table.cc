@@ -9895,6 +9895,39 @@ do_continue:;
       DBUG_RETURN(true);
     }
 
+    {
+      LEX_CSTRING new_path= { alter_ctx.get_new_path(), 0 };
+      new_path.length= strlen(new_path.str);
+      tmp_disable_binlog(thd);
+      create_info->alias= alter_ctx.table_name;
+      // FIXME: DDL log, MDL for new_name
+      if (create_table_impl(thd, (DDL_LOG_STATE*) 0, (DDL_LOG_STATE*) 0,
+                              alter_ctx.new_db, alter_ctx.new_name,
+                              alter_ctx.new_db, alter_ctx.new_name,
+                              new_path,
+                              thd->lex->create_info, create_info, alter_info,
+                              C_ALTER_TABLE_FRM_ONLY, NULL,
+                              &key_info, &key_count, &frm))
+      {
+        // FIXME: error
+        DBUG_RETURN(true);
+      }
+      reenable_binlog(thd);
+
+      TABLE_SHARE s;
+      init_tmp_table_share(thd, &s, alter_ctx.new_db.str, 0,
+                           alter_ctx.new_name.str, new_path.str);
+
+      s.frm_image= &frm;
+
+      if (s.init_from_binary_frm_image(thd, true, frm.str, frm.length))
+      {
+        // FIXME: error
+        DBUG_RETURN(true);
+      }
+    }
+    frm= {NULL, 0};
+
     // In-place execution of ALTER TABLE for partitioning.
     DBUG_RETURN(fast_alter_partition_table(thd, table, alter_info,
                                            create_info, table_list,

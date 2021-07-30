@@ -4865,6 +4865,7 @@ uint prep_alter_part_table(THD *thd, TABLE *table, Alter_info *alter_info,
   if (alter_info->partition_flags &
       (ALTER_PARTITION_ADD |
        ALTER_PARTITION_DROP |
+       ALTER_PARTITION_EXTRACT |
        ALTER_PARTITION_COALESCE |
        ALTER_PARTITION_REORGANIZE |
        ALTER_PARTITION_TABLE_REORG |
@@ -5360,7 +5361,8 @@ that are reorganised.
         tab_part_info->is_auto_partitioned= FALSE;
       }
     }
-    else if (alter_info->partition_flags & ALTER_PARTITION_DROP)
+    else if ((alter_info->partition_flags & ALTER_PARTITION_DROP) |
+             (alter_info->partition_flags & ALTER_PARTITION_EXTRACT))
     {
       /*
         Drop a partition from a range partition and list partitioning is
@@ -7218,6 +7220,48 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
       We insert Error injections at all places where it could be interesting
       to test if recovery is properly done.
     */
+    if (write_log_drop_shadow_frm(lpt) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_1") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_1") ||
+        mysql_write_frm(lpt, WFRM_WRITE_SHADOW) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_2") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_2") ||
+        wait_while_table_is_used(thd, table, HA_EXTRA_NOT_USED) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_3") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_3") ||
+        write_log_drop_partition(lpt) ||
+        (action_completed= TRUE, FALSE) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_4") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_4") ||
+        alter_close_table(lpt) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_5") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_5") ||
+        ERROR_INJECT_CRASH("crash_drop_partition_6") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_6") ||
+        (frm_install= TRUE, FALSE) ||
+        mysql_write_frm(lpt, WFRM_INSTALL_SHADOW) ||
+        log_partition_alter_to_ddl_log(lpt) ||
+        (frm_install= FALSE, FALSE) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_7") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_7") ||
+        mysql_drop_partitions(lpt) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_8") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_8") ||
+        (write_log_completed(lpt, FALSE), FALSE) ||
+        ((!thd->lex->no_write_to_binlog) &&
+         (write_bin_log(thd, FALSE,
+                        thd->query(), thd->query_length()), FALSE)) ||
+        ERROR_INJECT_CRASH("crash_drop_partition_9") ||
+        ERROR_INJECT_ERROR("fail_drop_partition_9"))
+    {
+      handle_alter_part_error(lpt, action_completed, TRUE, frm_install);
+      goto err;
+    }
+    if (alter_partition_lock_handling(lpt))
+      goto err;
+  }
+  else if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
+  {
     if (write_log_drop_shadow_frm(lpt) ||
         ERROR_INJECT_CRASH("crash_drop_partition_1") ||
         ERROR_INJECT_ERROR("fail_drop_partition_1") ||
