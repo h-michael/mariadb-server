@@ -9895,23 +9895,31 @@ do_continue:;
       DBUG_RETURN(true);
     }
 
+    if (alter_info->partition_flags & ALTER_PARTITION_EXTRACT)
     {
       LEX_CSTRING new_path= { alter_ctx.get_new_path(), 0 };
+      partition_info *work_part_info= thd->work_part_info;
+      handlerton *db_type= create_info->db_type;
       new_path.length= strlen(new_path.str);
       tmp_disable_binlog(thd);
       create_info->alias= alter_ctx.table_name;
       // FIXME: DDL log, MDL for new_name
+      thd->work_part_info= NULL;
+      create_info->db_type= work_part_info->default_engine_type;
       if (create_table_impl(thd, (DDL_LOG_STATE*) 0, (DDL_LOG_STATE*) 0,
-                              alter_ctx.new_db, alter_ctx.new_name,
-                              alter_ctx.new_db, alter_ctx.new_name,
-                              new_path,
-                              thd->lex->create_info, create_info, alter_info,
-                              C_ALTER_TABLE_FRM_ONLY, NULL,
-                              &key_info, &key_count, &frm))
+                            alter_ctx.new_db, alter_ctx.new_name,
+                            alter_ctx.new_db, alter_ctx.new_name, new_path,
+                            thd->lex->create_info, create_info, alter_info,
+                            C_ALTER_TABLE_FRM_ONLY, NULL,
+                            &key_info, &key_count, &frm))
       {
+        thd->work_part_info= work_part_info;
+        create_info->db_type= db_type;
         // FIXME: error
         DBUG_RETURN(true);
       }
+      thd->work_part_info= work_part_info;
+      create_info->db_type= db_type;
       reenable_binlog(thd);
 
       TABLE_SHARE s;
@@ -9926,7 +9934,7 @@ do_continue:;
         DBUG_RETURN(true);
       }
     }
-    frm= {NULL, 0};
+    frm= { NULL, 0 };
 
     // In-place execution of ALTER TABLE for partitioning.
     DBUG_RETURN(fast_alter_partition_table(thd, table, alter_info,
