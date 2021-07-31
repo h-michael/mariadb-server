@@ -711,6 +711,7 @@ bool mysql_insert(THD *thd, TABLE_LIST *table_list,
   Name_resolution_context_state ctx_state;
   SELECT_LEX *returning= thd->lex->has_returning() ? thd->lex->returning() : 0;
   unsigned char *readbuff= NULL;
+  thd->current_insert_index=0;
 
 #ifndef EMBEDDED_LIBRARY
   char *query= thd->query();
@@ -1131,6 +1132,7 @@ bool mysql_insert(THD *thd, TABLE_LIST *table_list,
   } while (bulk_parameters_iterations(thd));
 
 values_loop_end:
+  thd->current_insert_index= 0;
   free_underlaid_joins(thd, thd->lex->first_select_lex());
   joins_freed= TRUE;
 
@@ -1803,6 +1805,7 @@ int write_record(THD *thd, TABLE *table, COPY_INFO *info, select_result *sink)
   DBUG_ENTER("write_record");
 
   info->records++;
+  thd->current_insert_index= info->records;
   save_read_set= table->read_set;
   save_write_set= table->write_set;
 

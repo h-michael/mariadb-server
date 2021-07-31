@@ -908,6 +908,7 @@ THD::THD(my_thread_id id, bool is_wsrep_applier)
   org_charset= 0;
   /* Restore THR_THD */
   set_current_thd(old_THR_THD);
+  current_insert_index= 0;
 }
 
 

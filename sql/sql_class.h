@@ -559,6 +559,7 @@ typedef enum enum_diag_condition_item_name
   DIAG_CURSOR_NAME= 9,
   DIAG_MESSAGE_TEXT= 10,
   DIAG_MYSQL_ERRNO= 11,
+  DIAG_ERROR_INDEX= 12,
   LAST_DIAG_SET_PROPERTY= DIAG_MYSQL_ERRNO
 } Diag_condition_item_name;
 
@@ -5499,6 +5500,12 @@ public:
   {
     lex= backup_lex;
   }
+
+    /*
+      Stores the the processed record during INSERT. Used for assigning
+      value of error_index in case of warning or error.
+    */
+    ulonglong current_insert_index;
 };
 
 

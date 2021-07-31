@@ -789,3 +789,228 @@ GET DIAGNOSTICS @var1 = NUMBER;
 SHOW STATUS LIKE 'Com%get_diagnostics';
 Variable_name	Value
 Com_get_diagnostics	1
+#
+# MDEV-10075: Provide index of error causing error in array INSERT
+#
+#
+# INSERT STATEMENT
+#
+CREATE TABLE t1(id1 INT PRIMARY KEY, val1 VARCHAR(1));
+CREATE TABLE t2(id2 INT PRIMARY KEY, val2 VARCHAR(1));
+# Simple INSERT statement
+INSERT INTO t1 VALUES(1,'a'), (2,'b'), (3,'c');
+INSERT INTO t1 VALUES (4,'d'),(1,'a'),(2,'b');
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+GET DIAGNOSTICS CONDITION 1 @var1= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 2 @var2= ERROR_INDEX;
+Warnings:
+Error	1062	Duplicate entry '1' for key 'PRIMARY'
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 3 @var3= ERROR_INDEX;
+Warnings:
+Error	1062	Duplicate entry '1' for key 'PRIMARY'
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+SELECT @var1, @var2, @var3;
+@var1	@var2	@var3
+2		NULL
+INSERT IGNORE INTO t1 VALUES (5,'e'),(4,'d'),(6,'f'),(3,'c');
+Warnings:
+Warning	1062	Duplicate entry '4' for key 'PRIMARY'
+Warning	1062	Duplicate entry '3' for key 'PRIMARY'
+GET DIAGNOSTICS CONDITION 1 @var4= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 2 @var5= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 3 @var6= ERROR_INDEX;
+Warnings:
+Warning	1062	Duplicate entry '4' for key 'PRIMARY'
+Warning	1062	Duplicate entry '3' for key 'PRIMARY'
+Error	1758	Invalid condition number
+SELECT @var4, @var5, @var6;
+@var4	@var5	@var6
+2	4	NULL
+TRUNCATE TABLE t1;
+#INSERT...SET
+INSERT INTO t1 SET id1=1, val1='a';
+INSERT INTO t1 SET id1=2, val1='b';
+INSERT INTO t1 SET id1=3, val1='c';
+INSERT INTO t1 SET id1=4, val1='d';
+INSERT INTO t1 SET id1=1, val1='a';
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+GET DIAGNOSTICS CONDITION 1 @var7= ERROR_INDEX;
+INSERT IGNORE INTO t1 SET id1=5, val1='e';
+GET DIAGNOSTICS CONDITION 1 @var8= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+SELECT @var7, @var8;
+@var7	@var8
+1	NULL
+TRUNCATE TABLE t1;
+# INSERT...ON DUPLICATE KEY UPDATE
+INSERT INTO t1 VALUES (1,'a'), (2,'b'), (3,'c') ON DUPLICATE KEY UPDATE val1='d';
+INSERT INTO t1 VALUES (4,'d'), (1,'a'), (2,'b') ON DUPLICATE KEY UPDATE val1='e';
+GET DIAGNOSTICS CONDITION 1 @var9= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 2 @var10= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 3 @var11= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+SELECT @var9, @var10, @var11;
+@var9	@var10	@var11
+NULL	NULL	NULL
+INSERT IGNORE INTO t1 VALUES (5,'e'), (4,'d'), (6,'f'), (3,'c') ON DUPLICATE KEY UPDATE val1='e';
+GET DIAGNOSTICS CONDITION 1 @var12= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 2 @var13= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 3 @var14= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+SELECT @var12, @var13, @var14;
+@var12	@var13	@var14
+NULL	NULL	NULL
+TRUNCATE TABLE t1;
+# INSERT...SELECT
+INSERT INTO t1 VALUES (1,'a'),(2,'b'),(3,'c');
+INSERT INTO t2 SELECT * FROM t1;
+INSERT INTO t2 SELECT * FROM t1;
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+GET DIAGNOSTICS CONDITION 1 @var15= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 2 @var16= ERROR_INDEX;
+Warnings:
+Error	1062	Duplicate entry '1' for key 'PRIMARY'
+Error	1758	Invalid condition number
+GET DIAGNOSTICS CONDITION 3 @var17= ERROR_INDEX;
+Warnings:
+Error	1062	Duplicate entry '1' for key 'PRIMARY'
+Error	1758	Invalid condition number
+Error	1758	Invalid condition number
+SELECT @var15, @var16, @var17;
+@var15	@var16	@var17
+1	NULL	NULL
+INSERT IGNORE INTO t1 SELECT * FROM t1;
+Warnings:
+Warning	1062	Duplicate entry '1' for key 'PRIMARY'
+Warning	1062	Duplicate entry '2' for key 'PRIMARY'
+Warning	1062	Duplicate entry '3' for key 'PRIMARY'
+GET DIAGNOSTICS CONDITION 1 @var18= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 2 @var19= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 3 @var20= ERROR_INDEX;
+SELECT @var18, @var19, @var20;
+@var18	@var19	@var20
+1	2	3
+DROP TABLE t1;
+DROP TABLE t2;
+#
+# REPLACE STATEMENT
+#
+CREATE TABLE t1(id1 INT PRIMARY KEY, val1 VARCHAR(1));
+CREATE TABLE t2(id2 INT PRIMARY KEY, val2 VARCHAR(1));
+# Simple REPLACE statement
+REPLACE INTO t1 VALUES(1,'a'), (2,'b'), (3,'c');
+REPLACE INTO t1 VALUES (4,'d'),(1,'a'),(2,'b');
+GET DIAGNOSTICS CONDITION 1 @var1= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+SELECT @var1;
+@var1
+2
+TRUNCATE TABLE t1;
+#REPLACE...SET
+REPLACE INTO t1 SET id1=1, val1='a';
+REPLACE INTO t1 SET id1=2, val1='b';
+REPLACE INTO t1 SET id1=3, val1='c';
+REPLACE INTO t1 SET id1=4, val1='d';
+REPLACE INTO t1 SET id1=1, val1='a';
+GET DIAGNOSTICS CONDITION 1 @var2= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+SELECT @var2;
+@var2
+
+TRUNCATE TABLE t1;
+# REPLACE...SELECT
+REPLACE INTO t1 VALUES (1,'a'),(2,'b'),(3,'c');
+REPLACE INTO t2 SELECT * FROM t1;
+REPLACE INTO t2 SELECT * FROM t1;
+GET DIAGNOSTICS CONDITION 1 @var3= ERROR_INDEX;
+Warnings:
+Error	1758	Invalid condition number
+SELECT @var3;
+@var3
+NULL
+DROP TABLE t1;
+DROP TABLE t2;
+# Checking ERROR_INDEX in STORED PROCEDURE
+CREATE TABLE t1(id1 INT PRIMARY KEY);
+CREATE PROCEDURE proc1 ()
+BEGIN
+DECLARE var1 INT;
+DECLARE var2 INT;
+INSERT INTO t1 VALUES (1),(2);
+INSERT IGNORE INTO t1 VALUES(2);
+GET DIAGNOSTICS CONDITION 1 var1= ERROR_INDEX;
+GET DIAGNOSTICS CONDITION 2 var2= ERROR_INDEX;
+SELECT var1, var2;
+END;
+|
+CALL proc1();
+var1	var2
+1	NULL
+Warnings:
+Warning	1062	Duplicate entry '2' for key 'PRIMARY'
+Error	1758	Invalid condition number
+TRUNCATE TABLE t1;
+# Checking ERROR_INDEX in PREPARED STATEMENTS
+INSERT INTO t1 VALUES (1), (2), (3);
+INSERT IGNORE INTO t1 VALUES(2),(3),(4);
+Warnings:
+Warning	1062	Duplicate entry '2' for key 'PRIMARY'
+Warning	1062	Duplicate entry '3' for key 'PRIMARY'
+PREPARE stmt1 FROM "GET DIAGNOSTICS CONDITION 2 @var2= ERROR_INDEX";
+EXECUTE stmt1;
+SELECT @var2;
+@var2
+2
+DROP PROCEDURE proc1;
+DROP PREPARE stmt1;
+DROP TABLE t1;
+# Checking ERROR_INDEX in stored procedures
+CREATE TABLE t1(id1 INT PRIMARY KEY);
+CREATE PROCEDURE proc1 ()
+BEGIN
+DECLARE var1 INT;
+DECLARE var2 INT;
+REPLACE INTO t1 VALUES (1),(2);
+GET DIAGNOSTICS CONDITION 1 var1= ERROR_INDEX;
+SELECT var1;
+END;
+|
+CALL proc1();
+var1
+NULL
+Warnings:
+Error	1758	Invalid condition number
+TRUNCATE TABLE t1;
+# Checking ERROR_INDEX in PREPARED STATEMENTS
+REPLACE INTO t1 VALUES (1), (2), (3);
+PREPARE stmt1 FROM "GET DIAGNOSTICS CONDITION 2 @var2= ERROR_INDEX";
+EXECUTE stmt1;
+Warnings:
+Error	1758	Invalid condition number
+SELECT @var2;
+@var2
+2
+DROP PROCEDURE proc1;
+DROP PREPARE stmt1;
+DROP TABLE t1;
