@@ -9937,7 +9937,7 @@ do_continue:;
     frm= { NULL, 0 };
 
     // In-place execution of ALTER TABLE for partitioning.
-    DBUG_RETURN(fast_alter_partition_table(thd, table, alter_info,
+    DBUG_RETURN(fast_alter_partition_table(thd, table, alter_info, &alter_ctx,
                                            create_info, table_list,
                                            &alter_ctx.db,
                                            &alter_ctx.table_name));

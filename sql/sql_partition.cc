@@ -5442,6 +5442,8 @@ that are reorganised.
         my_error(ER_ROW_IS_REFERENCED, MYF(0));
         goto err;
       }
+      DBUG_ASSERT(!(alter_info->partition_flags & ALTER_PARTITION_EXTRACT) ||
+                  num_parts_dropped == 1);
       /* NOTE: num_parts is used in generate_partition_syntax() */
       tab_part_info->num_parts-= num_parts_dropped;
     }
@@ -6124,6 +6126,47 @@ static bool mysql_drop_partitions(ALTER_PARTITION_PARAM_TYPE *lpt)
     DBUG_RETURN(TRUE);
   }
   DBUG_RETURN(FALSE);
+}
+
+
+static bool mysql_extract_partition(ALTER_PARTITION_PARAM_TYPE *lpt)
+{
+  partition_info *part_info= lpt->table->part_info;
+  THD *thd= lpt->thd;
+  int error;
+  handler *file= get_new_handler(NULL, thd->mem_root, part_info->default_engine_type);
+
+  DBUG_ASSERT(lpt->thd->mdl_context.is_lock_owner(MDL_key::TABLE,
+                                                  lpt->table->s->db.str,
+                                                  lpt->table->s->table_name.str,
+                                                  MDL_EXCLUSIVE));
+  char from_name[FN_REFLEN + 1], to_name[FN_REFLEN + 1];
+  const char *path= lpt->table->s->path.str;
+
+  build_table_filename(to_name, sizeof(to_name) - 1, lpt->alter_ctx->db.str,
+                       lpt->alter_ctx->new_name.str, "", 0);
+
+  for (const partition_element &e: part_info->partitions)
+  {
+    if (e.part_state == PART_TO_BE_DROPPED)
+    {
+      if (unlikely((error= create_partition_name(from_name, sizeof(from_name),
+                                                 path, e.partition_name,
+                                                 NORMAL_PART_NAME, FALSE))))
+      {
+        return true;
+      }
+      if (unlikely(error= file->ha_rename_table(from_name, to_name)))
+      {
+        lpt->table->file->print_error(error, MYF(0));
+        my_error(ER_ERROR_ON_RENAME, MYF(0), from_name, to_name, my_errno);
+        return true;
+      }
+      break;
+    }
+  }
+
+  return false;
 }
 
 
@@ -7073,6 +7116,7 @@ bool log_partition_alter_to_ddl_log(ALTER_PARTITION_PARAM_TYPE *lpt)
 
 uint fast_alter_partition_table(THD *thd, TABLE *table,
                                 Alter_info *alter_info,
+                                Alter_table_ctx *alter_ctx,
                                 HA_CREATE_INFO *create_info,
                                 TABLE_LIST *table_list,
                                 const LEX_CSTRING *db,
@@ -7095,6 +7139,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
   lpt->table_list= table_list;
   lpt->part_info= part_info;
   lpt->alter_info= alter_info;
+  lpt->alter_ctx= alter_ctx;
   lpt->create_info= create_info;
   lpt->db_options= create_info->table_options_with_row_type();
   lpt->table= table;
@@ -7286,7 +7331,7 @@ uint fast_alter_partition_table(THD *thd, TABLE *table,
         (frm_install= FALSE, FALSE) ||
         ERROR_INJECT_CRASH("crash_drop_partition_7") ||
         ERROR_INJECT_ERROR("fail_drop_partition_7") ||
-        mysql_drop_partitions(lpt) ||
+        mysql_extract_partition(lpt) ||
         ERROR_INJECT_CRASH("crash_drop_partition_8") ||
         ERROR_INJECT_ERROR("fail_drop_partition_8") ||
         (write_log_completed(lpt, FALSE), FALSE) ||

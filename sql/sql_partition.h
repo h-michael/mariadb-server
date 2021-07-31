@@ -55,6 +55,7 @@ typedef struct st_lock_param_type
   THD *thd;
   HA_CREATE_INFO *create_info;
   Alter_info *alter_info;
+  Alter_table_ctx *alter_ctx;
   TABLE *table;
   KEY *key_info_buffer;
   LEX_CSTRING db;
@@ -255,6 +256,7 @@ typedef int (*get_partitions_in_range_iter)(partition_info *part_info,
 #ifdef WITH_PARTITION_STORAGE_ENGINE
 uint fast_alter_partition_table(THD *thd, TABLE *table,
                                 Alter_info *alter_info,
+                                Alter_table_ctx *alter_ctx,
                                 HA_CREATE_INFO *create_info,
                                 TABLE_LIST *table_list,
                                 const LEX_CSTRING *db,
