@@ -53,10 +53,11 @@ PARTITION BY HASH(id) (
 
 SET GLOBAL query_cache_type=ON;
 SET LOCAL query_cache_type=ON;
+
 SHOW variables like '%query_cache%';
 -- echo
 
-SELECT id, name FROM tbl_a;
+SELECT SQL_CACHE id, name FROM tbl_a;
 -- echo
 
 --connection child2_1
@@ -66,6 +67,7 @@ DELETE FROM tbl_a WHERE name = "remote_record_1";
 
 --connection master_1
 USE auto_test_local;
+-- echo
 SHOW variables like '%query_cache%';
 -- echo
 
