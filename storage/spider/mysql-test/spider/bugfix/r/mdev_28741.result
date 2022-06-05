@@ -1,0 +1,104 @@
+#
+# MDEV-28741 Disable query cache on Spider tables to avoid cache inconsistency
+#
+for master_1
+for child2
+child2_1
+child2_2
+child2_3
+for child3
+connection child2_1;
+CREATE DATABASE auto_test_remote;
+USE auto_test_remote;
+DROP TABLE IF EXISTS tbl_a;
+Warnings:
+Note	1051	Unknown table 'auto_test_remote.tbl_a'
+CREATE TABLE tbl_a (
+id int NOT NULL AUTO_INCREMENT,
+name varchar(255) DEFAULT NULL,
+PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO tbl_a (name) VALUES ('remote_record_1'), ('remote_record_2'), ('remote_record_3');
+
+connection child2_2;
+CREATE DATABASE auto_test_remote2;
+USE auto_test_remote2;
+DROP TABLE IF EXISTS tbl_a;
+Warnings:
+Note	1051	Unknown table 'auto_test_remote2.tbl_a'
+CREATE TABLE tbl_a (
+id int NOT NULL AUTO_INCREMENT,
+name varchar(255) DEFAULT NULL,
+PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO tbl_a (name) VALUES ('remote_2_record_1'), ('remote_2_record_2'), ('remote_2_record_3');
+
+connection master_1;
+CREATE DATABASE auto_test_local;
+USE auto_test_local;
+CREATE TABLE tbl_a (
+id int NOT NULL AUTO_INCREMENT,
+name varchar(255) DEFAULT NULL,
+PRIMARY KEY (id)
+) ENGINE=Spider DEFAULT CHARSET=utf8 COMMENT='table "tbl_a"'
+PARTITION BY HASH(id) (
+PARTITION pt1 COMMENT='srv "s_2_1"',
+PARTITION pt2 COMMENT='srv "s_2_2"'
+);
+
+SET GLOBAL query_cache_type=ON;
+SET LOCAL query_cache_type=ON;
+SHOW variables like '%query_cache%';
+Variable_name	Value
+have_query_cache	YES
+query_cache_limit	1048576
+query_cache_min_res_unit	4096
+query_cache_size	1048576
+query_cache_strip_comments	OFF
+query_cache_type	ON
+query_cache_wlock_invalidate	OFF
+
+SELECT id, name FROM tbl_a;
+id	name
+1	remote_record_1
+2	remote_record_2
+3	remote_record_3
+1	remote_2_record_1
+2	remote_2_record_2
+3	remote_2_record_3
+
+connection child2_1;
+USE auto_test_remote;
+DELETE FROM tbl_a WHERE name = "remote_record_1";
+
+connection master_1;
+USE auto_test_local;
+SHOW variables like '%query_cache%';
+Variable_name	Value
+have_query_cache	YES
+query_cache_limit	1048576
+query_cache_min_res_unit	4096
+query_cache_size	1048576
+query_cache_strip_comments	OFF
+query_cache_type	ON
+query_cache_wlock_invalidate	OFF
+
+SELECT id, name FROM tbl_a;
+id	name
+2	remote_record_2
+3	remote_record_3
+1	remote_2_record_1
+2	remote_2_record_2
+3	remote_2_record_3
+
+DROP DATABASE auto_test_local;
+connection child2_1;
+DROP DATABASE auto_test_remote;
+connection child2_2;
+DROP DATABASE auto_test_remote2;
+for master_1
+for child2
+child2_1
+child2_2
+child2_3
+for child3
