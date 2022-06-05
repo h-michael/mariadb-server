@@ -58,6 +58,17 @@ query_cache_strip_comments	OFF
 query_cache_type	ON
 query_cache_wlock_invalidate	OFF
 
+SHOW status like 'Qcache%';
+Variable_name	Value
+Qcache_free_blocks	1
+Qcache_free_memory	1031064
+Qcache_hits	0
+Qcache_inserts	0
+Qcache_lowmem_prunes	0
+Qcache_not_cached	0
+Qcache_queries_in_cache	0
+Qcache_total_blocks	1
+
 SELECT SQL_CACHE id, name FROM tbl_a;
 id	name
 1	remote_record_1
@@ -66,6 +77,17 @@ id	name
 1	remote_2_record_1
 2	remote_2_record_2
 3	remote_2_record_3
+
+SHOW status like 'Qcache%';
+Variable_name	Value
+Qcache_free_blocks	1
+Qcache_free_memory	1031064
+Qcache_hits	0
+Qcache_inserts	0
+Qcache_lowmem_prunes	0
+Qcache_not_cached	1
+Qcache_queries_in_cache	0
+Qcache_total_blocks	1
 
 connection child2_1;
 USE auto_test_remote;
@@ -83,6 +105,17 @@ query_cache_size	1048576
 query_cache_strip_comments	OFF
 query_cache_type	ON
 query_cache_wlock_invalidate	OFF
+
+SHOW status like 'Qcache%';
+Variable_name	Value
+Qcache_free_blocks	1
+Qcache_free_memory	1031064
+Qcache_hits	0
+Qcache_inserts	0
+Qcache_lowmem_prunes	0
+Qcache_not_cached	1
+Qcache_queries_in_cache	0
+Qcache_total_blocks	1
 
 SELECT id, name FROM tbl_a;
 id	name
