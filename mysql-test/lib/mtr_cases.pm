@@ -205,7 +205,7 @@ sub split_testname {
   my ($test_name)= @_;
 
   # If .test file name is used, get rid of directory part
-  $test_name= basename($test_name) if $test_name =~ /\.test$/;
+  $test_name= basename($test_name) if $test_name =~ /\.test\.sql$/;
 
   # Then, get the combinations:
   my ($test_name, @combs) = split /,/, $test_name;
@@ -217,7 +217,7 @@ sub split_testname {
     # Only testname given, ex: alias
     return (undef , $parts[0], @combs);
   } elsif (@parts == 2) {
-    # Either testname.test or suite.testname given
+    # Either testname.test.sql or suite.testname given
     # Ex. main.alias or alias.test
 
     if ($parts[1] eq "test")
@@ -699,7 +699,7 @@ sub collect_one_test_case {
   my %test_combs = map { $_ => 1 } @_;
   my $suitename =  $suite->{name};
   my $name      = "$suitename.$tname";
-  my $filename  = "$tpath/${tname}.test";
+  my $filename  = "$tpath/${tname}.test.sql";
 
   # ----------------------------------------------------------------------
   # Set defaults
@@ -893,34 +893,34 @@ sub collect_one_test_case {
     #   qwe-rty.foobar                   'aa,bb'  [ pass ]
     #   ...
     # the result can be expected in
-    #  * either .rdiff or .result file
+    #  * either .rdiff.sql or .result.sql file
     #  * either in the overlay or in the original suite
     #  * with or without combinations in the file name.
     # which means any of the following 15 file names can be used:
     #
-    #  1    rty/r/foo,aa,bb.result          
-    #  2    rty/r/foo,aa,bb.rdiff
-    #  3    qwe/r/foo,aa,bb.result
-    #  4    qwe/r/foo,aa,bb.rdiff
-    #  5    rty/r/foo,aa.result
-    #  6    rty/r/foo,aa.rdiff
-    #  7    qwe/r/foo,aa.result
-    #  8    qwe/r/foo,aa.rdiff
-    #  9    rty/r/foo,bb.result
-    # 10    rty/r/foo,bb.rdiff
-    # 11    qwe/r/foo,bb.result
-    # 12    qwe/r/foo,bb.rdiff
-    # 13    rty/r/foo.result
-    # 14    rty/r/foo.rdiff
-    # 15    qwe/r/foo.result
+    #  1    rty/r/foo,aa,bb.result.sql          
+    #  2    rty/r/foo,aa,bb.rdiff.sql
+    #  3    qwe/r/foo,aa,bb.result.sql
+    #  4    qwe/r/foo,aa,bb.rdiff.sql
+    #  5    rty/r/foo,aa.result.sql
+    #  6    rty/r/foo,aa.rdiff.sql
+    #  7    qwe/r/foo,aa.result.sql
+    #  8    qwe/r/foo,aa.rdiff.sql
+    #  9    rty/r/foo,bb.result.sql
+    # 10    rty/r/foo,bb.rdiff.sql
+    # 11    qwe/r/foo,bb.result.sql
+    # 12    qwe/r/foo,bb.rdiff.sql
+    # 13    rty/r/foo.result.sql
+    # 14    rty/r/foo.rdiff.sql
+    # 15    qwe/r/foo.result.sql
     #
     # They are listed, precisely, in the order of preference.
     # mtr will walk that list from top to bottom and the first file that
     # is found will be used.
     #
     # If this found file is a .rdiff, mtr continues walking down the list
-    # until the first .result file is found.
-    # A .rdiff is applied to that .result.
+    # until the first .result.sql file is found.
+    # A .rdiff is applied to that .result.sql.
     #
     my $re ='';
 
@@ -931,15 +931,15 @@ sub collect_one_test_case {
     $resdirglob.= ',' . $suite->{parent}->{rdir} if $suite->{parent};
 
     my %files;
-    for (<{$resdirglob}/$tname*.{rdiff,result}>) {
+    for (<{$resdirglob}/$tname*.{rdiff,result}\.sql>) {
       my ($path, $combs, $ext) =
-                  m@^(.*)/$tname((?:,$re)*)\.(rdiff|result)$@ or next;
+                  m@^(.*)/$tname((?:,$re)*)\.(rdiff.sql|result.sql)$@ or next;
       my @combs = sort split /,/, $combs;
       $files{$_} = join '~', (                # sort files by
         99 - scalar(@combs),                  # number of combinations DESC
         join(',', sort @combs),               # combination names ASC
         $path eq $suite->{rdir} ? 1 : 2,      # overlay first
-        $ext eq 'result' ? 1 : 2              # result before rdiff
+        $ext eq 'result.sql' ? 1 : 2              # result before rdiff
       );
     }
     my @results = sort { $files{$a} cmp $files{$b} } keys %files;
@@ -948,9 +948,9 @@ sub collect_one_test_case {
       my $result_file = shift @results;
       $tinfo->{result_file} = $result_file;
 
-      if ($result_file =~ /\.rdiff$/) {
-        shift @results while $results[0] =~ /\.rdiff$/;
-        mtr_error ("$result_file has no corresponding .result file")
+      if ($result_file =~ /\.rdiff\.sql$/) {
+        shift @results while $results[0] =~ /\.rdiff\.sql$/;
+        mtr_error ("$result_file has no corresponding .result.sql file")
           unless @results;
         $tinfo->{base_result} = $results[0];
 
@@ -960,10 +960,10 @@ sub collect_one_test_case {
         }
       }
     } else {
-      # No .result file exist
+      # No .result.sql file exist
       # Remember the path  where it should be
       # saved in case of --record
-      $tinfo->{record_file}= $suite->{rdir} . "/$tname.result";
+      $tinfo->{record_file}= $suite->{rdir} . "/$tname.result.sql";
     }
   }
 
@@ -1042,7 +1042,7 @@ sub get_tags_from_file($$) {
       # The rules below must match open_file() function of mysqltest.cc
       # Note that for the purpose of tag collection we ignore
       # non-existing files, and let mysqltest handle the error
-      # (e.g. mysqltest.test needs this)
+      # (e.g. mysqltest.test.sql needs this)
       for ((map { dirname("$_$suffix") } @prefix),
            $sdir, $pdir, $::glob_mysql_test_dir)
       {
